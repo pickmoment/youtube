@@ -1,0 +1,7 @@
+# binary
+youtube
+
+# Go
+*.test
+*.out
+vendor/
