@@ -26,6 +26,31 @@ type Video struct {
 	URL        string `json:"url"`
 }
 
+type VideoInfo struct {
+	ID          string   `json:"id"`
+	Title       string   `json:"title"`
+	Channel     string   `json:"channel"`
+	ChannelID   string   `json:"channel_id"`
+	ChannelURL  string   `json:"channel_url,omitempty"`
+	Duration    string   `json:"duration"`
+	PublishDate string   `json:"publish_date,omitempty"`
+	ViewCount   string   `json:"view_count,omitempty"`
+	Description string   `json:"description,omitempty"`
+	Tags        []string `json:"tags,omitempty"`
+	Thumbnail   string   `json:"thumbnail,omitempty"`
+	URL         string   `json:"url"`
+}
+
+type Channel struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Handle      string `json:"handle,omitempty"`
+	Description string `json:"description,omitempty"`
+	Subscribers string `json:"subscribers,omitempty"`
+	VideoCount  string `json:"video_count,omitempty"`
+	URL         string `json:"url"`
+}
+
 type TranscriptSegment struct {
 	Start    float64 `json:"start"`
 	Duration float64 `json:"duration"`
@@ -99,21 +124,94 @@ func videoIDFromInput(input string) (string, error) {
 }
 
 func channelPageURL(channel string) string {
+	return channelBaseURL(channel) + "/videos"
+}
+
+func channelBaseURL(channel string) string {
 	if strings.HasPrefix(channel, "http") {
 		base := strings.TrimRight(channel, "/")
-		if !strings.HasSuffix(base, "/videos") {
-			return base + "/videos"
-		}
-		return base
+		base = strings.TrimSuffix(base, "/videos")
+		return strings.TrimRight(base, "/")
 	}
 	if reChanID.MatchString(channel) {
-		return ytBase + "/channel/" + channel + "/videos"
+		return ytBase + "/channel/" + channel
 	}
 	handle := channel
 	if !strings.HasPrefix(handle, "@") {
 		handle = "@" + handle
 	}
-	return ytBase + "/" + handle + "/videos"
+	return ytBase + "/" + handle
+}
+
+func channelInfo(channel string) (*Channel, error) {
+	url := channelBaseURL(channel)
+	html, err := getHTML(url)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := extractJSONVar(html, "ytInitialData")
+	if err != nil {
+		return nil, err
+	}
+
+	ch := &Channel{URL: url}
+
+	if meta := jget(data, "metadata", "channelMetadataRenderer"); meta != nil {
+		ch.ID = jstr(meta, "externalId")
+		ch.Name = jstr(meta, "title")
+		ch.Description = jstr(meta, "description")
+		if chanURL := jstr(meta, "channelUrl"); chanURL != "" {
+			ch.URL = chanURL
+		}
+	}
+
+	// Old header format
+	if h := jget(data, "header", "c4TabbedHeaderRenderer"); h != nil {
+		if ch.Name == "" {
+			ch.Name = jstr(h, "title")
+		}
+		ch.Subscribers = jstr(h, "subscriberCountText", "simpleText")
+		if ch.Subscribers == "" {
+			ch.Subscribers = runsText(jget(h, "subscriberCountText"))
+		}
+		ch.VideoCount = runsText(jget(h, "videosCountText"))
+		ch.Handle = runsText(jget(h, "channelHandleText"))
+	}
+
+	// Newer pageHeaderRenderer format
+	if ch.Subscribers == "" {
+		if h := jget(data, "header", "pageHeaderRenderer"); h != nil {
+			vm := jget(h, "content", "pageHeaderViewModel")
+			if vm != nil {
+				if ch.Name == "" {
+					ch.Name = jstr(vm, "title", "dynamicText", "text", "content")
+					if ch.Name == "" {
+						ch.Name = jstr(vm, "title", "content")
+					}
+				}
+				rows := jarr(jget(vm, "metadata", "contentMetadataViewModel"), "metadataRows")
+				for _, row := range rows {
+					for _, part := range jarr(row, "metadataParts") {
+						text := jstr(part, "text", "content")
+						switch {
+						case strings.HasPrefix(text, "@") && ch.Handle == "":
+							ch.Handle = text
+						case strings.Contains(text, "구독자") || strings.Contains(text, "subscriber"):
+							ch.Subscribers = text
+						case strings.Contains(text, "동영상") || strings.Contains(text, "video"):
+							ch.VideoCount = text
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if ch.Name == "" {
+		return nil, fmt.Errorf("채널 정보를 찾을 수 없습니다")
+	}
+	return ch, nil
 }
 
 func parseVideoRenderer(vr any) *Video {
@@ -237,6 +335,102 @@ func channelVideos(channel string, limit int) ([]Video, error) {
 		}
 	}
 	return results, nil
+}
+
+func videoInfo(video string) (*VideoInfo, error) {
+	vid, err := videoIDFromInput(video)
+	if err != nil {
+		return nil, err
+	}
+
+	html, err := getHTML(ytBase + "/watch?v=" + vid)
+	if err != nil {
+		return nil, err
+	}
+	m := reInnertubeKey.FindStringSubmatch(html)
+	if m == nil {
+		return nil, fmt.Errorf("InnerTube API 키를 찾을 수 없습니다")
+	}
+
+	playerResp, err := postRaw(innertubeBase+"/player?key="+m[1]+"&prettyPrint=false", map[string]any{
+		"context": map[string]any{
+			"client": map[string]any{
+				"clientName":    "ANDROID",
+				"clientVersion": "20.10.38",
+			},
+		},
+		"videoId": vid,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	details := jget(playerResp, "videoDetails")
+	if details == nil {
+		return nil, fmt.Errorf("영상 정보를 찾을 수 없습니다")
+	}
+
+	info := &VideoInfo{
+		ID:        jstr(details, "videoId"),
+		Title:     jstr(details, "title"),
+		Channel:   jstr(details, "author"),
+		ChannelID: jstr(details, "channelId"),
+		URL:       ytBase + "/watch?v=" + vid,
+	}
+	if info.ChannelID != "" {
+		info.ChannelURL = ytBase + "/channel/" + info.ChannelID
+	}
+	if secs := jstr(details, "lengthSeconds"); secs != "" {
+		info.Duration = formatDuration(secs)
+	}
+	info.ViewCount = jstr(details, "viewCount")
+	info.Description = jstr(details, "shortDescription")
+
+	for _, kw := range jarr(details, "keywords") {
+		if s, ok := kw.(string); ok {
+			info.Tags = append(info.Tags, s)
+		}
+	}
+
+	thumbs := jarr(jget(details, "thumbnail"), "thumbnails")
+	if len(thumbs) > 0 {
+		info.Thumbnail = jstr(thumbs[len(thumbs)-1], "url")
+	}
+
+	if mf := jget(playerResp, "microformat", "playerMicroformatRenderer"); mf != nil {
+		if pd := jstr(mf, "publishDate"); pd != "" {
+			info.PublishDate = pd
+		}
+	}
+
+	// Prefer formatted view count and like count from ytInitialData
+	if data, err2 := extractJSONVar(html, "ytInitialData"); err2 == nil {
+		contents := jarr(jget(data, "contents", "twoColumnWatchNextResults", "results", "results"), "contents")
+		for _, c := range contents {
+			if pir := jget(c, "videoPrimaryInfoRenderer"); pir != nil {
+				if vc := jstr(pir, "viewCount", "videoViewCountRenderer", "viewCount", "simpleText"); vc != "" {
+					info.ViewCount = vc
+				}
+				break
+			}
+		}
+	}
+
+	return info, nil
+}
+
+func formatDuration(secs string) string {
+	n := 0
+	for _, c := range secs {
+		if c >= '0' && c <= '9' {
+			n = n*10 + int(c-'0')
+		}
+	}
+	h, m, s := n/3600, (n%3600)/60, n%60
+	if h > 0 {
+		return fmt.Sprintf("%d:%02d:%02d", h, m, s)
+	}
+	return fmt.Sprintf("%d:%02d", m, s)
 }
 
 // reInnertubeKey extracts the InnerTube API key from the video page HTML.

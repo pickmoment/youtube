@@ -1,6 +1,6 @@
 # youtube
 
-YouTube CLI — API 키 없이 영상 검색, 채널 목록 조회, 자막 추출을 하는 커맨드라인 도구.
+YouTube CLI — API 키 없이 영상 검색, 영상·채널 정보 조회, 채널 목록 조회, 자막 추출을 하는 커맨드라인 도구.
 
 YouTube InnerTube 내부 API를 직접 호출하므로 별도의 API 키나 인증이 필요 없습니다.
 
@@ -24,6 +24,8 @@ youtube <명령어> [옵션]
 
 명령어:
   search      키워드로 영상 검색
+  video       영상 기본 정보 조회
+  channel     채널 정보 조회
   videos      채널 영상 목록 조회
   transcript  영상 자막 추출
   install     AI 에이전트용 스킬 파일 설치
@@ -47,6 +49,48 @@ youtube search <검색어> [-n 개수] [-f json|text]
 ```bash
 youtube search "파이썬 튜토리얼" -n 5
 youtube search "machine learning" -f text
+```
+
+---
+
+### video — 영상 정보
+
+```bash
+youtube video <video> [-f json|text]
+```
+
+| 옵션 | 기본값 | 설명 |
+|------|--------|------|
+| `-f` | json | 출력 형식 (`json` \| `text`) |
+
+영상은 ID(11자), 전체 URL, 단축 URL(`youtu.be/...`) 모두 지원합니다.
+
+반환 필드: `id`, `title`, `channel`, `channel_id`, `channel_url`, `duration`, `publish_date`, `view_count`, `description`, `tags`, `thumbnail`, `url`
+
+```bash
+youtube video dQw4w9WgXcQ
+youtube video https://youtu.be/dQw4w9WgXcQ -f text
+```
+
+---
+
+### channel — 채널 정보
+
+```bash
+youtube channel <channel> [-f json|text]
+```
+
+| 옵션 | 기본값 | 설명 |
+|------|--------|------|
+| `-f` | json | 출력 형식 (`json` \| `text`) |
+
+채널은 핸들(`@veritasium`), 채널 ID(`UCHnyfMqiRRG1u-2MsSQLbXA`), 전체 URL 모두 지원합니다.
+
+반환 필드: `id`, `name`, `handle`, `description`, `subscribers`, `video_count`, `url`
+
+```bash
+youtube channel @veritasium
+youtube channel UCHnyfMqiRRG1u-2MsSQLbXA -f text
 ```
 
 ---

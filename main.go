@@ -14,6 +14,8 @@ func usage() {
 
 명령어:
   search      키워드로 영상 검색
+  video       영상 기본 정보 조회
+  channel     채널 정보 조회
   videos      채널 영상 목록 조회
   transcript  영상 자막 추출
   install     AI 에이전트용 스킬 파일 설치
@@ -34,6 +36,10 @@ func main() {
 	switch os.Args[1] {
 	case "search":
 		runSearch(os.Args[2:])
+	case "video":
+		runVideo(os.Args[2:])
+	case "channel":
+		runChannel(os.Args[2:])
 	case "videos":
 		runVideos(os.Args[2:])
 	case "transcript":
@@ -70,6 +76,48 @@ func runSearch(args []string) {
 		errExit(err.Error())
 	}
 	fmt.Println(fmtVideos(data, *format))
+}
+
+func runVideo(args []string) {
+	fs := flag.NewFlagSet("video", flag.ExitOnError)
+	fs.Usage = func() {
+		fmt.Fprintln(os.Stderr, "사용법: youtube video <video> [-f json|text]")
+		fs.PrintDefaults()
+	}
+	format := fs.String("f", "json", "출력 형식 (json|text)")
+	_ = fs.Parse(sortFlags(args, map[string]bool{"f": true}))
+
+	if fs.NArg() < 1 {
+		fmt.Fprintln(os.Stderr, "오류: 영상 ID 또는 URL이 필요합니다")
+		fs.Usage()
+		os.Exit(1)
+	}
+	data, err := videoInfo(fs.Arg(0))
+	if err != nil {
+		errExit(err.Error())
+	}
+	fmt.Println(fmtVideoInfo(data, *format))
+}
+
+func runChannel(args []string) {
+	fs := flag.NewFlagSet("channel", flag.ExitOnError)
+	fs.Usage = func() {
+		fmt.Fprintln(os.Stderr, "사용법: youtube channel <channel> [-f json|text]")
+		fs.PrintDefaults()
+	}
+	format := fs.String("f", "json", "출력 형식 (json|text)")
+	_ = fs.Parse(sortFlags(args, map[string]bool{"f": true}))
+
+	if fs.NArg() < 1 {
+		fmt.Fprintln(os.Stderr, "오류: 채널이 필요합니다")
+		fs.Usage()
+		os.Exit(1)
+	}
+	data, err := channelInfo(fs.Arg(0))
+	if err != nil {
+		errExit(err.Error())
+	}
+	fmt.Println(fmtChannel(data, *format))
 }
 
 func runVideos(args []string) {

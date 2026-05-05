@@ -12,12 +12,12 @@ const skillName = "ytb"
 
 const skillContent = `---
 name: ytb
-description: YouTube 자막 추출, 영상 검색, 채널 영상 목록을 제공하는 스킬. API 키 불필요. 사용자가 유튜브 영상 정보를 묻거나 /ytb를 입력했을 때 사용.
+description: YouTube 영상·채널 정보 조회, 영상 검색, 채널 영상 목록, 자막 추출을 제공하는 스킬. API 키 불필요. 사용자가 유튜브 영상 정보를 묻거나 /ytb를 입력했을 때 사용.
 ---
 
 # ytb
 
-YouTube를 직접 스크래핑하는 CLI 도구 ` + "`youtube`" + `을 실행해 자막·검색·채널 데이터를 가져오는 스킬. API 키 없이 동작한다.
+YouTube를 직접 스크래핑하는 CLI 도구 ` + "`youtube`" + `을 실행해 영상·채널 정보, 검색, 자막 데이터를 가져오는 스킬. API 키 없이 동작한다.
 
 ## CLI 위치
 
@@ -54,6 +54,32 @@ youtube search "<검색어>" [-n 개수] [-f json|text]
 ` + "```bash" + `
 youtube search "파이썬 튜토리얼" -n 5
 youtube search "machine learning"
+` + "```" + `
+
+### video — 영상 기본 정보
+
+` + "```bash" + `
+youtube video <video> [-f json|text]
+` + "```" + `
+
+- 반환 필드: id, title, channel, channel_id, channel_url, duration, publish_date, view_count, description, tags, thumbnail, url
+
+` + "```bash" + `
+youtube video dQw4w9WgXcQ
+youtube video https://youtu.be/dQw4w9WgXcQ
+` + "```" + `
+
+### channel — 채널 정보
+
+` + "```bash" + `
+youtube channel <channel> [-f json|text]
+` + "```" + `
+
+- 반환 필드: id, name, handle, description, subscribers, video_count, url
+
+` + "```bash" + `
+youtube channel @veritasium
+youtube channel UCHnyfMqiRRG1u-2MsSQLbXA
 ` + "```" + `
 
 ### videos — 채널 영상 목록
@@ -96,7 +122,17 @@ youtube transcript dQw4w9WgXcQ -t
 
 ## 사용 패턴
 
-**"이 영상 자막 뽑아줘" (URL 또는 ID 제공)**
+**"이 영상 정보 알려줘" (URL 또는 ID 제공)**
+` + "```bash" + `
+youtube video <video_id_or_url>
+` + "```" + `
+
+**"이 채널 정보 알려줘"**
+` + "```bash" + `
+youtube channel <handle_or_id>
+` + "```" + `
+
+**"이 영상 자막 뽑아줘"**
 ` + "```bash" + `
 youtube transcript <video_id_or_url>
 ` + "```" + `
