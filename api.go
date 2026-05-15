@@ -34,7 +34,10 @@ type VideoInfo struct {
 	ChannelURL  string   `json:"channel_url,omitempty"`
 	Duration    string   `json:"duration"`
 	PublishDate string   `json:"publish_date,omitempty"`
+	UploadDate  string   `json:"upload_date,omitempty"`
 	ViewCount   string   `json:"view_count,omitempty"`
+	IsLive      bool     `json:"is_live,omitempty"`
+	IsPrivate   bool     `json:"is_private,omitempty"`
 	Description string   `json:"description,omitempty"`
 	Tags        []string `json:"tags,omitempty"`
 	Thumbnail   string   `json:"thumbnail,omitempty"`
@@ -81,6 +84,11 @@ func jget(obj any, keys ...string) any {
 func jstr(obj any, keys ...string) string {
 	s, _ := jget(obj, keys...).(string)
 	return s
+}
+
+func jbool(obj any, keys ...string) bool {
+	b, _ := jget(obj, keys...).(bool)
+	return b
 }
 
 func jarr(obj any, keys ...string) []any {
@@ -322,11 +330,16 @@ func channelVideos(channel string, limit int) ([]Video, error) {
 
 	var results []Video
 	for _, item := range gridContents {
-		vr := jget(item, "richItemRenderer", "content", "videoRenderer")
-		if vr == nil {
+		content := jget(item, "richItemRenderer", "content")
+		if content == nil {
 			continue
 		}
-		vid := parseVideoRenderer(vr)
+		var vid *Video
+		if vr := jget(content, "videoRenderer"); vr != nil {
+			vid = parseVideoRenderer(vr)
+		} else if lvm := jget(content, "lockupViewModel"); lvm != nil {
+			vid = parseLockupViewModel(lvm)
+		}
 		if vid != nil {
 			results = append(results, *vid)
 			if len(results) >= limit {
@@ -335,6 +348,51 @@ func channelVideos(channel string, limit int) ([]Video, error) {
 		}
 	}
 	return results, nil
+}
+
+func parseLockupViewModel(lvm any) *Video {
+	id := jstr(lvm, "contentId")
+	if id == "" {
+		return nil
+	}
+
+	meta := jget(lvm, "metadata", "lockupMetadataViewModel")
+	title := jstr(meta, "title", "content")
+
+	var viewCount, uploadDate string
+	for _, row := range jarr(jget(meta, "metadata", "contentMetadataViewModel"), "metadataRows") {
+		for _, part := range jarr(row, "metadataParts") {
+			text := jstr(part, "text", "content")
+			switch {
+			case strings.Contains(text, "조회수") || strings.Contains(text, "views"):
+				viewCount = text
+			case viewCount != "" && uploadDate == "":
+				uploadDate = text
+			}
+		}
+	}
+
+	var duration string
+	for _, overlay := range jarr(jget(lvm, "contentImage", "thumbnailViewModel"), "overlays") {
+		for _, badge := range jarr(jget(overlay, "thumbnailBottomOverlayViewModel"), "badges") {
+			if t := jstr(badge, "thumbnailBadgeViewModel", "text"); t != "" {
+				duration = t
+				break
+			}
+		}
+		if duration != "" {
+			break
+		}
+	}
+
+	return &Video{
+		ID:         id,
+		Title:      title,
+		Duration:   duration,
+		UploadDate: uploadDate,
+		ViewCount:  viewCount,
+		URL:        ytBase + "/watch?v=" + id,
+	}
 }
 
 func videoInfo(video string) (*VideoInfo, error) {
@@ -375,6 +433,8 @@ func videoInfo(video string) (*VideoInfo, error) {
 		Title:     jstr(details, "title"),
 		Channel:   jstr(details, "author"),
 		ChannelID: jstr(details, "channelId"),
+		IsLive:    jbool(details, "isLiveContent"),
+		IsPrivate: jbool(details, "isPrivate"),
 		URL:       ytBase + "/watch?v=" + vid,
 	}
 	if info.ChannelID != "" {
@@ -403,14 +463,15 @@ func videoInfo(video string) (*VideoInfo, error) {
 		}
 	}
 
-	// Prefer formatted view count and like count from ytInitialData
+	// ytInitialData: publish date fallback + relative upload date
 	if data, err2 := extractJSONVar(html, "ytInitialData"); err2 == nil {
 		contents := jarr(jget(data, "contents", "twoColumnWatchNextResults", "results", "results"), "contents")
 		for _, c := range contents {
 			if pir := jget(c, "videoPrimaryInfoRenderer"); pir != nil {
-				if vc := jstr(pir, "viewCount", "videoViewCountRenderer", "viewCount", "simpleText"); vc != "" {
-					info.ViewCount = vc
+				if info.PublishDate == "" {
+					info.PublishDate = jstr(pir, "dateText", "simpleText")
 				}
+				info.UploadDate = jstr(pir, "relativeDateText", "simpleText")
 				break
 			}
 		}

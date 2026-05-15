@@ -63,10 +63,17 @@ func fmtVideoInfo(v *VideoInfo, format string) string {
 		meta = append(meta, v.Duration)
 	}
 	if v.PublishDate != "" {
-		meta = append(meta, v.PublishDate)
+		date := v.PublishDate
+		if v.UploadDate != "" {
+			date += " (" + v.UploadDate + ")"
+		}
+		meta = append(meta, date)
 	}
 	if v.ViewCount != "" {
-		meta = append(meta, v.ViewCount)
+		meta = append(meta, "조회수 "+v.ViewCount+"회")
+	}
+	if v.IsLive {
+		meta = append(meta, "🔴 라이브")
 	}
 	if len(meta) > 0 {
 		lines = append(lines, strings.Join(meta, "  "))

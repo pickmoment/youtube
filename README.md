@@ -65,7 +65,15 @@ youtube video <video> [-f json|text]
 
 영상은 ID(11자), 전체 URL, 단축 URL(`youtu.be/...`) 모두 지원합니다.
 
-반환 필드: `id`, `title`, `channel`, `channel_id`, `channel_url`, `duration`, `publish_date`, `view_count`, `description`, `tags`, `thumbnail`, `url`
+반환 필드: `id`, `title`, `channel`, `channel_id`, `channel_url`, `duration`, `publish_date`, `upload_date`, `view_count`, `is_live`, `is_private`, `description`, `tags`, `thumbnail`, `url`
+
+| 필드 | 설명 |
+|------|------|
+| `publish_date` | 게시일 (예: `2026. 5. 13.`) |
+| `upload_date` | 상대 날짜 (예: `1일 전`, `2주 전`) |
+| `view_count` | 조회수 (순수 숫자 문자열, 예: `"5214"`) |
+| `is_live` | 라이브 방송 여부 (`true`일 때만 포함) |
+| `is_private` | 비공개 여부 (`true`일 때만 포함) |
 
 ```bash
 youtube video dQw4w9WgXcQ
