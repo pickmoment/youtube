@@ -153,10 +153,33 @@ youtube transcript dQw4w9WgXcQ -f text           # 코드블록 형식
 Claude Code 또는 Codex에서 `/ytb` 명령어로 이 도구를 사용할 수 있도록 스킬 파일을 설치합니다.
 
 ```bash
-youtube install
+youtube install [--agent claude|codex] [--scope global|project] [--yes] [--backup]
 ```
 
-에이전트(Claude Code / Codex)와 설치 범위(global / project)를 대화형으로 선택합니다.
+| 옵션 | 기본값 | 설명 |
+|------|--------|------|
+| `--agent` | (대화형) | 에이전트 (`claude` \| `codex`) |
+| `--scope` | (대화형) | 설치 범위 (`global`: 모든 프로젝트 / `project`: 현재 프로젝트만) |
+| `--yes` | false | 확인 프롬프트 없이 설치 (CI·스크립트용) |
+| `--backup` | false | 기존 파일을 `.bak`으로 백업 후 덮어쓰기 |
+
+플래그를 생략하면 에이전트와 설치 범위를 대화형으로 선택합니다.
+
+```bash
+# 대화형
+youtube install
+
+# 비대화형 (스크립트)
+youtube install --agent claude --scope global --yes
+```
+
+설치 경로:
+- Claude Code global: `~/.claude/skills/ytb/SKILL.md`
+- Claude Code project: `.claude/skills/ytb/SKILL.md`
+- Codex global: `~/.codex/skills/ytb/SKILL.md`
+- Codex project: `.codex/skills/ytb/SKILL.md`
+
+project scope로 설치한 경우 팀과 공유하려면 해당 파일을 커밋하세요.
 
 ## 출력 형식
 

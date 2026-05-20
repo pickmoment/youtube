@@ -80,7 +80,7 @@ youtube videos <channel> [-n 개수] [-f json|text]
 ```
 
 - `-n`: 최대 영상 수, 기본 20
-- 반환 필드: id, title, duration, upload_date, view_count, url
+- 반환 필드: id, title, channel, duration, upload_date, view_count, url
 
 ```bash
 youtube videos @veritasium -n 10
